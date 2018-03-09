@@ -1,4 +1,11 @@
 # OneDrive Go Client
+## NOTE: still work in progress 
+
+
+### Supported methods
+
+* Get file
+* Put file
 
 
 ## Rest Calls example ( cURL )
