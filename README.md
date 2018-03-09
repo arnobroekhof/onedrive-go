@@ -1,6 +1,7 @@
 # OneDrive Go Client
 ## NOTE: still work in progress 
 
+[![Build Status](https://travis-ci.org/arnobroekhof/onedrive-go.svg?branch=master)](https://travis-ci.org/arnobroekhof/onedrive-go)
 
 ### Supported methods
 
