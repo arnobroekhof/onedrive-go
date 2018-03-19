@@ -47,5 +47,12 @@ func TestValidateToken(t *testing.T) {
 	valid, claims, err := ValidateToken("")
 	assert.Equal(t, false, valid)
 	assert.Equal(t, map[string]interface{}(nil), claims)
-	assert.Error(t, err, "token cannot be empty")
+	assert.EqualError(t, err, "token cannot be empty")
+}
+
+func TestInvalidToken(t *testing.T) {
+	valid, claims, err := ValidateToken("1234567890")
+	assert.Equal(t, false, valid)
+	assert.Equal(t, map[string]interface{}(nil), claims)
+	assert.EqualError(t, err, "token contains an invalid number of segments")
 }
