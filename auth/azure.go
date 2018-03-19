@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -73,4 +76,41 @@ func addCertificateHeaderAndFooter(key string) string {
 	footerString := "-----END CERTIFICATE-----"
 	pubKey := []string{headerString, key, footerString}
 	return strings.Join(pubKey, "\n")
+}
+
+func ValidateToken(tokenString string) (authenticated bool, claimMap map[string]interface{}, err error) {
+
+	if tokenString == "" {
+		return authenticated, claimMap, errors.New("token cannot be empty")
+	}
+
+	var token *jwt.Token
+	token, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		azure, err := RetrieveKeys()
+		if err != nil {
+			return nil, err
+		}
+
+		x5t := token.Header["x5t"].(string)
+		stringKey, err := azure.GetX5TMatchingPubKey(x5t)
+
+		var verifyKey *rsa.PublicKey
+		verifyKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(stringKey))
+		if err != nil {
+			return nil, err
+		}
+
+		return verifyKey, nil
+	})
+
+	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return token.Valid, token.Claims.(jwt.MapClaims), nil
+	} else {
+		return token.Valid, nil, err
+	}
 }

@@ -42,3 +42,10 @@ func TestAzure_GetKIDMatchingPubKey(t *testing.T) {
 	pubKey, err := azure.GetX5TMatchingPubKey("SSQdhI1cKvhQEDSJxE2gGYs40Q0")
 	certificateChecking(t, err, pubKey)
 }
+
+func TestValidateToken(t *testing.T) {
+	valid, claims, err := ValidateToken("")
+	assert.Equal(t, false, valid)
+	assert.Equal(t, map[string]interface{}(nil), claims)
+	assert.Error(t, err, "token cannot be empty")
+}
