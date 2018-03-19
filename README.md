@@ -8,9 +8,45 @@
 * Get file
 * Put file
 
-### Helper libraries
+### Middleware libraries
 
 * Azure JWT authentication and verification
+
+example:
+
+
+create the following go code:
+
+```go
+package main
+
+import (
+	"github.com/arnobroekhof/onedrive-go/auth"
+	"github.com/gorilla/mux"
+)
+
+func main() {
+	r := mux.NewRouter()
+	r.Handle("/test", auth.AzureJWTAuthMiddleware(TestHandler())).Methods(http.MethodGet)
+	log.Println("Listening on http://127.0.0.1:8080")
+	log.Fatalln(http.ListenAndServe("127.0.0.1:8080", r))
+
+}
+
+func TestHandler() http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Write([]byte(`{"message": "it works"}`))
+	}
+}
+```
+
+create request using cURL:
+
+```bash
+curl -v -XGET http://localhost:8080/rest/test -H "Authorization: bearer <retrieved token from azure: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1....."
+```
+
 
 
 ## Rest Calls example ( cURL )
