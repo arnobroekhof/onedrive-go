@@ -32,3 +32,7 @@ func NewOnedrive(token string) (*Onedrive, error) {
 func constructOneDriveUrl() string {
 	return graphUrl + "/" + apiVersion + "/" + entity + "/" + drivePath
 }
+
+func (o *Onedrive) Connect() error {
+	return nil
+}

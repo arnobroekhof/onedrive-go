@@ -26,3 +26,7 @@ func TestReadGraphURL(t *testing.T) {
 	t.Logf("Using drive url: %s", constructOneDriveUrl())
 	assert.Equal(t, constructOneDriveUrl(), od.graphUrl)
 }
+
+func TestOneDrive_Connect(t *testing.T) {
+
+}

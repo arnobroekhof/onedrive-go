@@ -8,6 +8,10 @@
 * Get file
 * Put file
 
+### Helper libraries
+
+* Azure JWT authentication and verification
+
 
 ## Rest Calls example ( cURL )
 ### Upload
@@ -16,3 +20,5 @@ curl https://graph.microsoft.com/v1.0/me/drive/root:/document1.docx:/content -X 
 curl https://graph.microsoft.com/v1.0/me/drive/root:/document1.docx:/content -X GET  -H "Authorization: bearer access_token_here"
 ### Convert to PDF
 curl https://graph.microsoft.com/v1.0/me/drive/root:/document1.docx:/content?format=pdf -o document1.pdf -H "Authorization: bearer access_token_here"
+### Drive metadata
+curl https://graph.microsoft.com/v1.0/drives/me -X GET  -H "Authorization: bearer access_token_here"

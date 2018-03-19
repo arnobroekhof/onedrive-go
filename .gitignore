@@ -25,3 +25,6 @@ vendor/
 # Test binary, build with `go test -c`
 # Output of the go coverage tool, specifically when used with LiteIDE
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+
+# Test file
+./test
