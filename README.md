@@ -44,7 +44,7 @@ func TestHandler() http.HandlerFunc {
 create request using cURL:
 
 ```bash
-curl -v -XGET http://localhost:8080/rest/test -H "Authorization: bearer <retrieved token from azure: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1....."
+curl -v -XGET http://localhost:8080/test -H "Authorization: bearer <retrieved token from azure: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1....."
 ```
 
 
