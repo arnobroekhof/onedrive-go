@@ -108,9 +108,10 @@ func ValidateToken(tokenString string) (authenticated bool, claimMap map[string]
 		return verifyKey, nil
 	})
 
-	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+	if token.Valid {
 		return token.Valid, token.Claims.(jwt.MapClaims), nil
 	} else {
 		return token.Valid, nil, err
 	}
+
 }
