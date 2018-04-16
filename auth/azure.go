@@ -8,12 +8,22 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 const (
 	keysUrl = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
+	// https://login.microsoftonline.com/{tenantId}/oauth2/token
+	tokenUrl        = "https://login.microsoftonline.com"
+	authTokenSUffix = "/oauth2/token"
+)
+
+var (
+	tenantId = os.Getenv("TENANT_ID")
+	clientId = os.Getenv("CLIENT_ID")
+	secret   = os.Getenv("SECRET")
 )
 
 // Azure struct
@@ -78,14 +88,21 @@ func addCertificateHeaderAndFooter(key string) string {
 	return strings.Join(pubKey, "\n")
 }
 
-func ValidateToken(tokenString string) (authenticated bool, claimMap map[string]interface{}, err error) {
+// GetAccessToken retieve access token to use with microsoft
+func GetAccessToken(idTokenString string) (string, error) {
 
-	if tokenString == "" {
+	return "", nil
+}
+
+// ValidateToken: use x5t for v1.0 token and kid for v2.0 tokens
+func ValidateToken(idTokenString string) (authenticated bool, claimMap map[string]interface{}, err error) {
+
+	if idTokenString == "" {
 		return authenticated, claimMap, errors.New("token cannot be empty")
 	}
 
 	var token *jwt.Token
-	token, err = jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err = jwt.Parse(idTokenString, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -96,8 +113,8 @@ func ValidateToken(tokenString string) (authenticated bool, claimMap map[string]
 			return nil, err
 		}
 
-		x5t := token.Header["x5t"].(string)
-		stringKey, err := azure.GetX5TMatchingPubKey(x5t)
+		kid := token.Header["kid"].(string)
+		stringKey, err := azure.GetKIDMatchingPubKey(kid)
 
 		var verifyKey *rsa.PublicKey
 		verifyKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(stringKey))
