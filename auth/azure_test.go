@@ -5,54 +5,34 @@ import (
 	"testing"
 )
 
-func TestRetrieveKeys(t *testing.T) {
-	azure := retrieveKeys(t)
+func TestRetrieveOpenIdConfiguration(t *testing.T) {
+	openIdconfig, err := retrieveOpenIdConfiguration()
+	assert.NoError(t, err, "error expected nil")
+	assert.IsType(t, &openIDConfiguration{}, openIdconfig)
 
-	assert.NotEmpty(t, azure)
-	t.Logf("retrieved %v keys", len(azure.Keys))
-}
-func retrieveKeys(t *testing.T) *Azure {
-	azure, err := RetrieveKeys()
-	assert.Nil(t, err)
-	return azure
-}
-
-func TestAzure_GetX5TMatchingPubKey(t *testing.T) {
-	azure := retrieveKeys(t)
-
-	assert.NotEmpty(t, azure)
-
-	pubKey, err := azure.GetX5TMatchingPubKey("SSQdhI1cKvhQEDSJxE2gGYs40Q0")
-	certificateChecking(t, err, pubKey)
-}
-func certificateChecking(t *testing.T, err error, pubKey string) {
-	assert.Nil(t, err)
-	assert.NotEmpty(t, pubKey)
-	assert.IsType(t, "", pubKey)
-	assert.Contains(t, pubKey, "-----BEGIN CERTIFICATE-----")
-	assert.Contains(t, pubKey, "-----END CERTIFICATE-----")
+	keys, err := openIdconfig.RetrieveJwksKeys()
+	assert.NoError(t, err)
+	assert.IsType(t, &jwksKeys{}, keys)
+	assert.Len(t, keys.Keys, 5)
 }
 
-func TestAzure_GetKIDMatchingPubKey(t *testing.T) {
-	azure := retrieveKeys(t)
-
-	assert.NotEmpty(t, azure)
-	t.Logf("retrieved %v keys", len(azure.Keys))
-
-	pubKey, err := azure.GetX5TMatchingPubKey("SSQdhI1cKvhQEDSJxE2gGYs40Q0")
-	certificateChecking(t, err, pubKey)
+func TestInvalidIdToken(t *testing.T) {
+	authenticated, claims, err := ValidateIdToken("12345678910")
+	assert.Error(t, err, "token contains an invalid number of segments")
+	assert.Nil(t, claims, "Claims cannot be nil")
+	assert.False(t, authenticated)
 }
 
-func TestValidateToken(t *testing.T) {
-	valid, claims, err := ValidateToken("")
-	assert.Equal(t, false, valid)
-	assert.Equal(t, map[string]interface{}(nil), claims)
-	assert.EqualError(t, err, "token cannot be empty")
+func TestNoIdTokenGiven(t *testing.T) {
+	authenticated, claims, err := ValidateIdToken("")
+	assert.Error(t, err, "no id token provided")
+	assert.Nil(t, claims, "Claims cannot be nil")
+	assert.False(t, authenticated)
 }
 
-func TestInvalidToken(t *testing.T) {
-	valid, claims, err := ValidateToken("1234567890")
-	assert.Equal(t, false, valid)
-	assert.Equal(t, map[string]interface{}(nil), claims)
-	assert.EqualError(t, err, "token contains an invalid number of segments")
+func TestGetClaimsFromAccessToken(t *testing.T) {
+	claims, err := GetClaimsFromAccessToken("")
+	assert.Error(t, err, "no access token provided")
+	assert.Nil(t, claims)
+
 }

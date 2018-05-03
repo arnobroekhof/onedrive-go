@@ -1,35 +1,37 @@
 package auth
 
 import (
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 )
 
-const (
-	keysUrl = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
-	// https://login.microsoftonline.com/{tenantId}/oauth2/token
-	tokenUrl        = "https://login.microsoftonline.com"
-	authTokenSUffix = "/oauth2/token"
-)
+type openIDConfiguration struct {
+	AuthorizationEndpoint             string      `json:"authorization_endpoint"`
+	TokenEndpoint                     string      `json:"token_endpoint"`
+	TokenEndpointAuthMethodsSupported []string    `json:"token_endpoint_auth_methods_supported"`
+	JwksURI                           string      `json:"jwks_uri"`
+	ResponseModesSupported            []string    `json:"response_modes_supported"`
+	SubjectTypesSupported             []string    `json:"subject_types_supported"`
+	IDTokenSigningAlgValuesSupported  []string    `json:"id_token_signing_alg_values_supported"`
+	HTTPLogoutSupported               bool        `json:"http_logout_supported"`
+	FrontchannelLogoutSupported       bool        `json:"frontchannel_logout_supported"`
+	EndSessionEndpoint                string      `json:"end_session_endpoint"`
+	ResponseTypesSupported            []string    `json:"response_types_supported"`
+	ScopesSupported                   []string    `json:"scopes_supported"`
+	Issuer                            string      `json:"issuer"`
+	ClaimsSupported                   []string    `json:"claims_supported"`
+	RequestURIParameterSupported      bool        `json:"request_uri_parameter_supported"`
+	TenantRegionScope                 interface{} `json:"tenant_region_scope"`
+	CloudInstanceName                 string      `json:"cloud_instance_name"`
+	CloudGraphHostName                string      `json:"cloud_graph_host_name"`
+	MsgraphHost                       string      `json:"msgraph_host"`
+}
 
-var (
-	tenantId = os.Getenv("TENANT_ID")
-	clientId = os.Getenv("CLIENT_ID")
-	secret   = os.Getenv("SECRET")
-)
-
-// Azure struct
-//Grab the certificate (the first value in the x5c property array) from either https://login.microsoftonline.com/common/discovery/keys or https://login.microsoftonline.com/common/discovery/v2.0/keys, matching kid and x5t from the id_token.
-//Wrap the certificate in -----BEGIN CERTIFICATE-----\n and \n-----END CERTIFICATE----- (the newlines seem to matter), and use the result as Public Key (in conjunction with the id_token, on https://jwt.io/ ).
-type Azure struct {
+type jwksKeys struct {
 	Keys []struct {
 		Kty    string   `json:"kty"`
 		Use    string   `json:"use"`
@@ -42,11 +44,14 @@ type Azure struct {
 	} `json:"keys"`
 }
 
-func RetrieveKeys() (*Azure, error) {
+const (
+	openIDConfigurationUri = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration"
+)
 
+func retrieveOpenIdConfiguration() (openIdConfiguration *openIDConfiguration, err error) {
 	// create httpClient with timeout option
 	var httpClient = &http.Client{Timeout: 10 * time.Second}
-	res, err := httpClient.Get(keysUrl)
+	res, err := httpClient.Get(openIDConfigurationUri)
 	if err != nil {
 		return nil, err
 	}
@@ -54,84 +59,120 @@ func RetrieveKeys() (*Azure, error) {
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 
-	var azure *Azure
-	mErr := json.Unmarshal(body, &azure)
+	err = json.Unmarshal(body, &openIdConfiguration)
+	if err != nil {
+		return nil, err
+	}
+
+	return openIdConfiguration, err
+}
+
+func (o openIDConfiguration) RetrieveJwksKeys() (jwksKeys *jwksKeys, err error) {
+
+	// create httpClient with timeout option
+	var httpClient = &http.Client{Timeout: 10 * time.Second}
+	res, err := httpClient.Get(o.JwksURI)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+
+	mErr := json.Unmarshal(body, &jwksKeys)
 	if err != nil {
 		return nil, mErr
 	}
 
-	return azure, nil
+	return jwksKeys, nil
 }
 
-func (a Azure) GetX5TMatchingPubKey(x5t string) (string, error) {
-	for _, key := range a.Keys {
-		if key.X5T == x5t {
-			return addCertificateHeaderAndFooter(key.X5C[0]), nil
-		}
+func convertToPemBlock(key string) ([]byte, error) {
+
+	beforeHeader := "-----BEGIN PUBLIC KEY-----\n"
+	afterHeader := "\n-----END PUBLIC KEY-----"
+
+	return []byte(beforeHeader + key + afterHeader), nil
+
+}
+
+func (j jwksKeys) getX5C(kid string) (string, error) {
+	if kid == "" {
+		return "", errors.New("token cannot be empty")
 	}
-	return "", errors.New("no matching x5t key found")
-}
 
-func (a Azure) GetKIDMatchingPubKey(kid string) (string, error) {
-	for _, key := range a.Keys {
+	for _, key := range j.Keys {
 		if key.Kid == kid {
-			return addCertificateHeaderAndFooter(key.X5C[0]), nil
+			return key.X5C[0], nil
 		}
 	}
-	return "", errors.New("no matching x5t key found")
+
+	return "", errors.New("no mathing kid found")
+
 }
 
-func addCertificateHeaderAndFooter(key string) string {
-	headerString := "-----BEGIN CERTIFICATE-----"
-	footerString := "-----END CERTIFICATE-----"
-	pubKey := []string{headerString, key, footerString}
-	return strings.Join(pubKey, "\n")
+// GetClaimsFromAccessToken: only get the claims from the access token, it does not check if a token is valid
+// because Microsoft says the following:
+// Currently, access tokens issued by the v2.0 endpoint can be consumed only by Microsoft Services.
+// Your apps shouldn't need to perform
+// any validation or inspection of access tokens for any of the currently supported scenarios
+// https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-v2-tokens
+func GetClaimsFromAccessToken(accessToken string) (map[string]interface{}, error) {
+	if accessToken == "" {
+		return nil, errors.New("no access token provided")
+	}
+
+	token, _ := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+		return nil, nil
+	})
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		return claims, nil
+	} else {
+		return nil, errors.New("unable to extract claims")
+	}
+
 }
 
-// GetAccessToken retieve access token to use with microsoft
-func GetAccessToken(idTokenString string) (string, error) {
-
-	return "", nil
-}
-
-// ValidateToken: use x5t for v1.0 token and kid for v2.0 tokens
-func ValidateToken(idTokenString string) (authenticated bool, claimMap map[string]interface{}, err error) {
+// ValidateIdToken validated the OpenID connect token
+func ValidateIdToken(idTokenString string) (authenticated bool, claimMap map[string]interface{}, err error) {
 
 	if idTokenString == "" {
-		return authenticated, claimMap, errors.New("token cannot be empty")
+		return authenticated, claimMap, errors.New("no id token provided")
 	}
 
-	var token *jwt.Token
-	token, err = jwt.Parse(idTokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
+	token, err := jwt.Parse(idTokenString, func(token *jwt.Token) (interface{}, error) {
 
-		azure, err := RetrieveKeys()
+		openIDConfiguration, err := retrieveOpenIdConfiguration()
 		if err != nil {
 			return nil, err
 		}
 
-		kid := token.Header["kid"].(string)
-		stringKey, err := azure.GetKIDMatchingPubKey(kid)
-
-		var verifyKey *rsa.PublicKey
-		verifyKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(stringKey))
+		jwksKeys, err := openIDConfiguration.RetrieveJwksKeys()
 		if err != nil {
 			return nil, err
 		}
 
-		return verifyKey, nil
+		x5c, err := jwksKeys.getX5C(token.Header["kid"].(string))
+
+		pemBlock, err := convertToPemBlock(x5c)
+		if err != nil {
+			return nil, err
+		}
+
+		return jwt.ParseRSAPublicKeyFromPEM(pemBlock)
+
 	})
 
 	if err != nil {
 		return false, nil, err
 	}
 
-	if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return token.Valid, token.Claims.(jwt.MapClaims), nil
-	} else {
-		return token.Valid, nil, err
+	if !token.Valid {
+		return token.Valid, nil, errors.New("token invalid")
 	}
+
+	claims := token.Claims.(jwt.MapClaims)
+	return token.Valid, claims, nil
+
 }
