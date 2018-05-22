@@ -30,9 +30,15 @@ func TestNoIdTokenGiven(t *testing.T) {
 	assert.False(t, authenticated)
 }
 
-func TestGetClaimsFromAccessToken(t *testing.T) {
+func TestGetClaimsFromNilAccessToken(t *testing.T) {
 	claims, err := GetClaimsFromAccessToken("")
 	assert.Error(t, err, "no access token provided")
 	assert.Nil(t, claims)
 
+}
+
+func TestGetClaimsFromAccessToken(t *testing.T) {
+	claims, err := GetClaimsFromAccessToken("")
+	assert.NoError(t, err)
+	assert.NotNil(t, claims["name"])
 }

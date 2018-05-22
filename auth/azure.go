@@ -118,6 +118,7 @@ func (j jwksKeys) getX5C(kid string) (string, error) {
 // any validation or inspection of access tokens for any of the currently supported scenarios
 // https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-v2-tokens
 func GetClaimsFromAccessToken(accessToken string) (map[string]interface{}, error) {
+
 	if accessToken == "" {
 		return nil, errors.New("no access token provided")
 	}
@@ -125,6 +126,7 @@ func GetClaimsFromAccessToken(accessToken string) (map[string]interface{}, error
 	token, _ := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
 		return nil, nil
 	})
+
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		return claims, nil
